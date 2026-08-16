@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - rel-*
+      - codex/ort-1.29-openvino-2026.2.1-build
   pull_request:
     branches:
       - main
@@ -18,11 +19,7 @@ concurrency:
 jobs:
   BUILD_OPENVINO_EP:
     name: Windows OpenVINO CI Pipeline
-    runs-on: [
-      "self-hosted",
-      "1ES.Pool=onnxruntime-github-vs2022-latest",
-      "JobId=BUILD_OPENVINO_EP-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}"
-      ]
+    runs-on: windows-2022
     timeout-minutes: 240
     env:
       AZCOPY_AUTO_LOGIN_TYPE: MSI
@@ -159,6 +156,13 @@ jobs:
         run: |
           python.exe ${{ github.workspace }}\tools\ci_build\build.py --config ${{ env.BuildConfig }} --build_dir build --cmake_generator "Visual Studio 17 2022" --build_shared_lib --use_openvino CPU --use_binskim_compliant_compile_flags --build --parallel
 
+      - name: Install ORT
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          cmake --install "${{ runner.temp }}\build\${{ env.BuildConfig }}" `
+            --config "${{ env.BuildConfig }}" `
+            --prefix "${{ runner.temp }}\ort-openvino-install"
 
       - name: Run unit tests
         shell: pwsh
@@ -172,3 +176,12 @@ jobs:
             --use_openvino CPU `
             --use_binskim_compliant_compile_flags `
             --test --enable_onnx_tests
+
+      - name: Upload installed ORT package
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnxruntime-1.29.0-openvino-2026.2.1-windows-x64-${{ env.BuildConfig }}
+          path: ${{ runner.temp }}\ort-openvino-install
+          if-no-files-found: error
+          retention-days: 14
